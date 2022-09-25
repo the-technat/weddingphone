@@ -25,14 +25,15 @@ Of course you need `go` to develop. But there are some more tools and hardware y
 - Ensure you have `go` 1.19 installed
 - Ensure you have the go programm `github.com/gokrazy/tools/cmd/gokr-packer@latest` installed and GOBIN in your PATH
 - Ensure you have a Raspberry Pi 2/3B/3B+ with a decent power supply and an SD card (size doesn't matter)
-- For easier development I recommend you also have a serial to usb cable that can be attached to the raspberry pi (something [like this](https://www.pi-shop.ch/usb-to-ttl-serial-kable-debug-console-kable-fuer-den-raspberry-pi))
-  - of course a monitor and HDMI cable does the trick too
+- A [tailscale](https://tailscale.com) account to connect to your raspberry pi from everywhere
+  - of course a serial to usb cable that can be attached to the raspberry pi (something [like this](https://www.pi-shop.ch/usb-to-ttl-serial-kable-debug-console-kable-fuer-den-raspberry-pi)) does the trick too
+  - or use a monitor and HDMI cable
 
 ### gokrazy
 
 As mentioned in the intro, we are using gokrazy for this project (no Raspberry Pi OS or other Pi friendly linux distro). This has multiple advantages which you can read more about [here](https://gokrazy.org/).
 
-So to bootstrap your Raspberry Pi using gokrazy and our programm, insert your SD card into the computer and find it's device path. This quicksatrt uses `/dev/mmcblk0` as device path.
+So to bootstrap your Raspberry Pi using gokrazy, insert your SD card into the computer and find it's device path. This quicksatrt uses `/dev/mmcblk0` as device path (Change your's in `Makefile` accordingly).
 
 Next you need to decide whether you want to use WiFi or Ethernet (for the rest of the Pis life time it will be managed over the network).
 
@@ -44,55 +45,30 @@ echo '{"ssid": "Secure WiFi", "psk": "secret"}' > extrafiles/github.com/gokrazy/
 
 Note: if you get an error 'path does not exist', run `mkdir -p extrafiles/github.com/gokrazy/wifi/etc/`.
 
-For Ethernet you can remove the `github.com/gokrazy/wifi` package from the command below.
-
-Make sure your Raspberry Pi can be resolved using the hostname you specified below (e.g mine would be `weddingphone.silver.lan`)
-
-Then your very Pi can be bootstraped using the following command:
+Next you need to know that I'm using [tailscale](https://gokrazy.org/packages/tailscale/) to connect to the raspberry pi using the hostname `weddingphone` from everywhere. If you want to use that too, get yourself an account at [tailscale.com](https://tailscale.com) and generate an [auth key](https://login.tailscale.com/admin/settings/keys) for the raspberry pi which you insert at bootstrap time like so:
 
 ```console
-gokr-packer \
-  -tls=self-signed \
-  -overwrite=/dev/mmcblk0 \
-  -hostname weddingphone.silver.lan \
-  -serial_console=disabled \
-  github.com/gokrazy/fbstatus \
-  github.com/gokrazy/serial-busybox \
-  github.com/gokrazy/breakglass \ 
-  github.com/gokrazy/wifi \
-  github.com/the-technat/weddingphone
+mkdir -p flags/tailscale.com/tailscale/
+cat > flags/tailscale.com/cmd/tailscale/flags.txt <<EOF
+up
+--auth-key=tskey-AAAAAAAAAAAA-AAAAAAAAAAAAAAAAAAAAAA
+EOF
 ```
 
-Some notes:
+If you don't want to use tailscale, just make sure you can reach the pi using the hostname `weddingphone` somehow.
 
-- `-tls=self-signed` enables the web UI to be access over HTTPS
-- `-overwrite=/dev/mmcblk0` specifies that this is the first bootstrap and that it should go to this SD card
-- `-hostname weddingphone.silver.lan` specifies how this device is named and for which domain the certificate is issued
-- `-serial_console=disabled` says that the device outputs some status informations on the HDMI port but has no other method of interactin with the device -> remove this if you want to see everything the device outputs on serial (primary) and HDMI (secondary)
-- `github.com/gokrazy/fbstatus` -> very minimal status display that can be seen on the HDMI output
-- `github.com/gokrazy/serial-busybox` -> very minimal console that can be accessed either via serial (if enabled) or using a monitor/keyboard
-- `github.com/gokrazy/breakglass` -> minimal ssh access to the device's serial-busybox console
-- `github.com/gokrazy/wifi` -> WiFi support for the device (remove this package if you only want to use Ethernet)
-- `github.com/the-technat/weddingphone` -> the actual programm that we want to install
-
-All of the specified programms are stared automatically at boot and do what they are designed for. You can remove any of them if you don't need them. I recommend for a production ready device that you remove the `breakglass` programm but enable the serial console...
-
-#### Work with gokrazy devices
-
-Once you plug in your device, it will boot up and establish a network connection over DHCP. You can then access the web interface using your defined hostname (mine would be [https://weddingphone.silver.lan](https://weddingphone.silver.lan)).
-There you can see your running programms, their stdout/stderr as well as any environment variables, some os stats and that's it. Very minimal.
-
-If you want to update the weddingphone programm you can use the following command do to so:
+Then you can bootstrap the SD card with gokrazy:
 
 ```console
-gokr-packer \ 
-  -tls=self-signed \ 
-  -update=yes \ 
-  -hostname weddingphone.silver.lan \
-  -serial_console=disabled \
-  github.com/the-technat/weddingphone
+# Using wifi and tailscale
+make card=/dev/mmcblk0 overwrite
+
+# Without tailscale
+make card=/dev/mmcblk0 overwrite-no-tailscale
 ```
 
-This will compile and push the new version of the weddingphone programm to the Pi and then restart the device.
+Put the SD card into your raspberry, plug in power and access the Web stats using `http://weddingphone`
 
-Of course you can also do a full upgrade of the entire gokrazy instance, see [here](https://github.com/gokrazy/gokrazy#updating-your-installation) for instruction on that.
+If you want to update the weddingphone use `make update` (over the network).
+
+Of course you can also do a full upgrade of the entire gokrazy instance, see [here](https://github.com/gokrazy/gokrazy#updating-your-installation) for instructions on that.
