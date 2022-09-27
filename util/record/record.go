@@ -1,6 +1,7 @@
 package record
 
 import (
+	"context"
 	"encoding/binary"
 	"os"
 
@@ -8,7 +9,8 @@ import (
 	"github.com/the-technat/weddingphone/util/errors"
 )
 
-func RecordToFile(file string, stop chan os.Signal) error {
+// RecordToFile takes the given filepath, creates the file and write AIFF comtabile audio to it, until context is cancelled
+func RecordToFile(ctx context.Context, file string) error {
 	f, err := os.Create(file)
 	errors.CheckError(err)
 
@@ -62,8 +64,9 @@ func RecordToFile(file string, stop chan os.Signal) error {
 		errors.CheckError(binary.Write(f, binary.BigEndian, in))
 		nSamples += len(in)
 		select {
-		case <-stop:
+		case <-ctx.Done():
 			errors.CheckError(stream.Stop())
+			return nil
 		default:
 		}
 	}
