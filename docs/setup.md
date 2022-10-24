@@ -52,6 +52,5 @@ To run the software, do the following:
 ```bash
 git clone https://github.com/the-technat/weddingphone.git 
 cd weddingphone
-make build
-./dist/weddingphone
+make run
 ```
