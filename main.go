@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
 	"path"
 	"time"
 
@@ -10,13 +11,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/the-technat/weddingphone/util/play"
 	"github.com/the-technat/weddingphone/util/record"
-)
-
-const (
-	// INTRO - the file that should be played as intro to the users
-	INTRO = "/home/technat/code/weddingphone/assets/intro.aiff"
-	// OUT - the folder where recordings should be saved
-	OUT = "/perm/recordings/"
 )
 
 func main() {
@@ -27,6 +21,13 @@ func main() {
 	})
 	log.Info("starting weddingphone...")
 
+	// Read IN & OUT
+	introPath := os.Getenv("INTRO_PATH")
+	saveDir := os.Getenv("SAVE_PATH")
+	if saveDir == "" || introPath == "" {
+		log.Errorf("Env vars INTRO_PATH and/or SAVE_PATH not set")
+	}
+
 	// concurrency handling
 	main := context.Background()
 
@@ -34,10 +35,10 @@ func main() {
 	portaudio.Initialize()
 
 	// First intro sound
-	// play.PlayAIFF(main, INTRO)
+	play.PlayAIFF(main, introPath)
 
 	// Figure out a recording file
-	recordingFile := path.Join(OUT, fmt.Sprintf("%d.%s", time.Now().Unix(), "aiff"))
+	recordingFile := path.Join(saveDir, fmt.Sprintf("%d.%s", time.Now().Unix(), "aiff"))
 
 	// Record the message
 	recordCtx, cancelRecord := context.WithCancel(main) // Create a new child context from main
