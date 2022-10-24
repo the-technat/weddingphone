@@ -12,7 +12,8 @@ lint: staticcheck
 	staticcheck ./...
 
 run: 
-	go run main.go
+	mkdir -p ${PWD}/dist/recordings
+	INTRO_PATH=${PWD}/assets/intro.aiff SAVE_PATH=${PWD}/dist/recordings go run main.go
 
 build:
 	CGO_ENABLED=${CGO_ENABLED} GOOS=${GOOS} GOARCH=${GOARCH} go build -o dist/weddingphone main.go 
