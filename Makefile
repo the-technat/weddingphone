@@ -15,9 +15,12 @@ run:
 	mkdir -p ${PWD}/dist/recordings
 	INTRO_PATH=${PWD}/assets/intro.aiff SAVE_PATH=${PWD}/dist/recordings go run main.go
 
-build:
+build: go 
 	CGO_ENABLED=${CGO_ENABLED} GOOS=${GOOS} GOARCH=${GOARCH} go build -o dist/weddingphone main.go 
 	echo "Binary available at ${PWD}/dist/weddingphone"
 
-staticcheck:
+staticcheck: go
 	go install honnef.co/go/tools/cmd/staticcheck@latest 
+
+go:
+	which go 
