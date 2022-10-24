@@ -15,6 +15,4 @@
 # vendor/
 
 # Custom
-extrafiles/github.com/gokrazy/wifi/etc/wifi.json
-flags/tailscale.com/cmd/tailscale/flags.txt
-builddir/
+dist/
