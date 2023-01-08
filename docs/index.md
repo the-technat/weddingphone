@@ -1,3 +1,4 @@
 # Docs - weddingphone
 
-- [Setup](setup.md)
+- [Hardware](hardware.md)
+- Setup](setup.md)

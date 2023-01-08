@@ -10,9 +10,13 @@ Take an SD Card, download [rpi-imager](https://github.com/raspberrypi/rpi-imager
 
 To manage the device from everywhere I setup [tailscale](https://tailscale.com) on the device.
 
-See [this guide](https://tailscale.com/kb/1197/install-rpi-bullseye/) for tailscale.
+See [this guide](https://tailscale.com/kb/1197/install-rpi-bullseye/) for installing tailscale.
 
-Switch port to 59245 in `/etc/ssh/sshd_config` for my ssh setup, so that we can `ssh weddingphone`.
+Then run `sudo tailscale up --ssh` on your device and login.
+
+## SSH
+
+Switch port to 59245 in `/etc/ssh/sshd_config`.
 
 ## UFW
 
@@ -41,16 +45,16 @@ echo 'export GOPATH=$HOME/go' | sudo tee -a ~/.bashrc
 echo 'export PATH=$GOPATH/bin:$GOROOT/bin:$PATH' | sudo tee -a ~/.bashrc
 ```
 
-### Portaudio
+### Alsa
 
-Should alread by installed in the newest version.
+Make sure `alsa-utils` are installed.
 
 ## Run
 
 To run the software, do the following:
 
 ```bash
-git clone https://github.com/the-technat/weddingphone.git 
+git clone https://github.com/the-technat/weddingphone.git
 cd weddingphone
 make run
 ```

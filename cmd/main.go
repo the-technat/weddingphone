@@ -4,52 +4,129 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/signal"
 	"path"
+	"syscall"
 	"time"
 
-	"github.com/gordonklaus/portaudio"
 	log "github.com/sirupsen/logrus"
-	"github.com/the-technat/weddingphone/util/play"
-	"github.com/the-technat/weddingphone/util/record"
+	"github.com/the-technat/weddingphone/util/device"
+	"github.com/the-technat/weddingphone/util/sound"
 )
 
-func main() {
-	// Logging
+const ()
+
+var (
+	SAVE_PATH     = "./dist/recordings"
+	mainCtx, stop = context.WithCancel(context.Background())
+	recordChannel = make(chan bool)
+)
+
+func init() {
 	log.SetFormatter(&log.TextFormatter{
-		DisableColors: true,
+		DisableColors: false,
 		FullTimestamp: true,
 	})
-	log.Info("starting weddingphone...")
 
-	// Read IN & OUT
-	introPath := os.Getenv("INTRO_PATH")
-	saveDir := os.Getenv("SAVE_PATH")
-	if saveDir == "" || introPath == "" {
-		log.Errorf("Env vars INTRO_PATH and/or SAVE_PATH not set")
+	// make sure output directory is set
+	savePath, found := os.LookupEnv("SAVE_PATH")
+	if found {
+		// check if dir also exists
+		_, err := os.Stat(savePath)
+		if err != nil {
+			os.MkdirAll(savePath, os.FileMode(0751))
+			log.Warningf("%s doesn't existed, created it")
+			SAVE_PATH = savePath
+		}
 	}
+	if !found {
+		err := os.MkdirAll(SAVE_PATH, os.FileMode(0751))
+		if err != nil {
+			log.Fatal(err)
+		}
+		log.Warningf("SAVE_PATH not set, using default of %s", SAVE_PATH)
+	}
+}
 
-	// concurrency handling
-	main := context.Background()
+func main() {
+	// Device initalization according to ../docs/hardware.md
+	d := device.New(
+		map[string]device.LED{
+			"status": {
+				Color: "green",
+				Pin:   2,
+			},
+			"recording": {
+				Color: "orange",
+				Pin:   3,
+			},
+		},
+		map[string]device.Button{
+			"recording": {
+				Pin:                     4,
+				EnableFallEdgeDetection: true,
+			},
+			"play": {
+				Pin:                     27,
+				EnableFallEdgeDetection: true,
+			},
+		},
+	)
+	defer d.Close()
 
-	// Initialize audio system
-	portaudio.Initialize()
+	// Sound initalization
+	ss := sound.NewAlsaSound()
 
-	// First intro sound
-	play.PlayAIFF(main, introPath)
+	log.Print("started weddingphone")
+	defer stop()
+	d.BlinkDuration(mainCtx, "status", time.Second/5, 2*time.Second)
+	d.LEDs["status"].Toggle()
 
-	// Figure out a recording file
-	recordingFile := path.Join(saveDir, fmt.Sprintf("%d.%s", time.Now().Unix(), "aiff"))
+	// continuously monitor the button for a trigger
+	// notify the recordChannel in case of a buttonPress
+	go d.ButtonEvents(mainCtx, "recording", recordChannel, time.Second)
 
-	// Record the message
-	recordCtx, cancelRecord := context.WithCancel(main) // Create a new child context from main
-	go record.RecordToFile(recordCtx, recordingFile)    // start recording in the background
-	time.Sleep(10 * time.Second)                        // Wait 10s
-	cancelRecord()                                      // Then stop the recording
+	// continuously check if we got notifed about a button press
+	// if so, record until the next button press
+	go recordRoutine(mainCtx, recordChannel, d, ss)
 
-	// Play the message
-	time.Sleep(1 * time.Second)
-	play.PlayAIFF(main, recordingFile)
+	// Shutdown routine
+	done := make(chan struct{})
+	go func() {
+		shutdown := make(chan os.Signal, 1)
+		signal.Notify(shutdown, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
+		// wait for someone to request shutdown (e.g ctrl+c or systemd)
+		<-shutdown
+		// if shutdown is requested, close the main ctx which should cause all sub-process (which derive from mainCtx) to stop
+		stop()
+		// and notify the main programm to stop as well
+		close(done)
+	}()
 
-	// Shutodwn rountine
-	portaudio.Terminate()
+	<-done
+	log.Print("stopped weddingphone")
+}
+
+func recordRoutine(ctx context.Context, notify chan bool, d *device.Device, ss sound.SoundSystem) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-notify:
+			// start blinking
+			blinkerCtx, stopBlinker := context.WithCancel(ctx)
+			go d.Blink(blinkerCtx, "recording", time.Second)
+
+			// start recording
+			recordingFile := path.Join(SAVE_PATH, fmt.Sprintf("%d.%s", time.Now().Unix(), "wav"))
+			recordCtx, stopRecording := context.WithCancel(ctx)
+			go ss.RecordToFile(recordCtx, recordingFile)
+
+			<-notify
+			stopRecording()
+			stopBlinker()
+			// d.LEDs["recording"].PullDown()
+			log.Print("recording stopped")
+		}
+	}
 }
